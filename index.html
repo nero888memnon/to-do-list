@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>To-Do App</title>
+  <!-- Tailwind CSS CDN for styling -->
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 text-gray-800">
+  <div class="container mx-auto p-4">
+    <!-- App Title -->
+    <h1 class="text-2xl font-bold text-center mb-6">To-Do List</h1>
+    
+    <!-- Tasks List Container -->
+    <div id="tasks-container" class="space-y-4 mb-6">
+      <!-- Task cards will be injected here by JavaScript -->
+    </div>
+    
+    <!-- Add Task Button -->
+    <div class="text-center">
+      <button id="addTaskBtn" class="bg-blue-500 text-white font-medium py-2 px-6 rounded-full shadow hover:bg-blue-600 transition-colors">
+        + Add Task
+      </button>
+    </div>
+    
+    <!-- Task Modal (hidden by default) -->
+    <div id="taskModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+      <!-- Modal Inner Card -->
+      <div class="bg-white rounded-lg shadow-lg p-6 w-80">
+        <h2 id="modalTitle" class="text-xl font-semibold mb-4">Add Task</h2>
+        <!-- Task Form -->
+        <form id="taskForm" class="space-y-3">
+          <input type="text" id="taskName" class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:border-blue-500" placeholder="Task title" required />
+          <input type="date" id="taskDue" class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:border-blue-500" />
+          <select id="taskPriority" class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:border-blue-500">
+            <option value="Low">Low Priority</option>
+            <option value="Medium">Medium Priority</option>
+            <option value="High">High Priority</option>
+          </select>
+          <select id="taskCategory" class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:border-blue-500">
+            <option value="Personal">Personal</option>
+            <option value="Work">Work</option>
+            <option value="Shopping">Shopping</option>
+          </select>
+          <!-- Form Action Buttons -->
+          <div class="flex justify-end space-x-2 pt-2">
+            <button type="button" id="cancelBtn" class="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400">Cancel</button>
+            <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Inline JavaScript for functionality -->
+  <script>
+    // Task data structure: { name, due, priority, category, completed }
+    let tasks = [];
+    let editIndex = null;
+    
+    // Load tasks from LocalStorage if available
+    const savedTasks = localStorage.getItem('tasks');
+    if (savedTasks) {
+      tasks = JSON.parse(savedTasks);
+    }
+    
+    // Save tasks to LocalStorage
+    function saveTasks() {
+      localStorage.setItem('tasks', JSON.stringify(tasks));
+    }
+    
+    // Render the tasks list to the page
+    function renderTasks() {
+      const container = document.getElementById('tasks-container');
+      container.innerHTML = '';  // clear current list
+      tasks.forEach((task, index) => {
+        // Create card container
+        const card = document.createElement('div');
+        card.className = 'flex justify-between items-start bg-white shadow-md rounded-lg p-4 transition-all duration-300 ease-out opacity-0';
+        // Add colored left border based on priority
+        if (task.priority === 'High') {
+          card.classList.add('border-l-4', 'border-red-500');
+        } else if (task.priority === 'Medium') {
+          card.classList.add('border-l-4', 'border-yellow-500');
+        } else {
+          card.classList.add('border-l-4', 'border-green-500');
+        }
+        
+        // Left side: Checkbox + task info
+        const leftSide = document.createElement('label');
+        leftSide.className = 'flex items-center';
+        // Checkbox
+        const check = document.createElement('input');
+        check.type = 'checkbox';
+        check.checked = task.completed;
+        check.className = 'mr-2 accent-green-500';  // 'accent-green-500' styles the checkbox (Tailwind 3.x)
+        // Toggle completion status on change
+        check.addEventListener('change', () => {
+          task.completed = check.checked;
+          saveTasks();
+          renderTasks();
+        });
+        leftSide.appendChild(check);
+        // Task text and details
+        const info = document.createElement('div');
+        // Task title
+        const title = document.createElement('div');
+        title.textContent = task.name;
+        title.className = 'font-medium';
+        if (task.completed) {
+          title.classList.add('line-through', 'text-gray-500');
+        } else {
+          // Color title by priority if not completed
+          if (task.priority === 'High') title.classList.add('text-red-700');
+          if (task.priority === 'Medium') title.classList.add('text-yellow-700');
+          if (task.priority === 'Low') title.classList.add('text-green-700');
+        }
+        info.appendChild(title);
+        // Due date & category (small text)
+        const meta = document.createElement('div');
+        meta.className = 'text-sm text-gray-600';
+        let metaText = '';
+        if (task.category) metaText += task.category;
+        if (task.due) metaText += (metaText ? ' – Due: ' : 'Due: ') + task.due;
+        meta.textContent = metaText;
+        info.appendChild(meta);
+        leftSide.appendChild(info);
+        
+        // Right side: action buttons
+        const rightSide = document.createElement('div');
+        rightSide.className = 'flex space-x-3';
+        // Edit button
+        const editBtn = document.createElement('button');
+        editBtn.textContent = '✏️';
+        editBtn.className = 'text-gray-500 hover:text-blue-500';
+        editBtn.title = 'Edit task';
+        editBtn.addEventListener('click', () => openModal(index));
+        // Delete button
+        const delBtn = document.createElement('button');
+        delBtn.textContent = '🗑️';
+        delBtn.className = 'text-gray-500 hover:text-red-500';
+        delBtn.title = 'Delete task';
+        delBtn.addEventListener('click', () => {
+          // Animate fade-out then remove
+          card.classList.add('opacity-0', '-translate-y-2');
+          setTimeout(() => {
+            tasks.splice(index, 1);
+            saveTasks();
+            renderTasks();
+          }, 300); // match duration to CSS transition
+        });
+        rightSide.appendChild(editBtn);
+        rightSide.appendChild(delBtn);
+        
+        // Assemble card
+        card.appendChild(leftSide);
+        card.appendChild(rightSide);
+        container.appendChild(card);
+        // Trigger fade-in animation for new card
+        requestAnimationFrame(() => {
+          card.classList.remove('opacity-0');
+        });
+      });
+    }
+    
+    // Open the modal form (for adding or editing task)
+    function openModal(taskIndex = null) {
+      const modal = document.getElementById('taskModal');
+      const titleElem = document.getElementById('modalTitle');
+      const form = document.getElementById('taskForm');
+      // Reset form fields
+      form.reset();
+      editIndex = null;
+      if (taskIndex !== null) {
+        // Edit existing task
+        editIndex = taskIndex;
+        const t = tasks[taskIndex];
+        titleElem.textContent = 'Edit Task';
+        document.getElementById('taskName').value = t.name;
+        document.getElementById('taskDue').value = t.due || '';
+        document.getElementById('taskPriority').value = t.priority;
+        document.getElementById('taskCategory').value = t.category;
+      } else {
+        // New task
+        titleElem.textContent = 'Add Task';
+      }
+      // Show modal
+      modal.classList.remove('hidden');
+    }
+    
+    // Close modal on "Cancel"
+    document.getElementById('cancelBtn').addEventListener('click', () => {
+      document.getElementById('taskModal').classList.add('hidden');
+    });
+    
+    // Add Task button opens the modal for a new task
+    document.getElementById('addTaskBtn').addEventListener('click', () => {
+      openModal();
+    });
+    
+    // Handle form submission for add/edit
+    document.getElementById('taskForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      // Get form values
+      const name = document.getElementById('taskName').value.trim();
+      const due = document.getElementById('taskDue').value;
+      const priority = document.getElementById('taskPriority').value;
+      const category = document.getElementById('taskCategory').value;
+      if (editIndex !== null) {
+        // Update existing task
+        tasks[editIndex].name = name;
+        tasks[editIndex].due = due;
+        tasks[editIndex].priority = priority;
+        tasks[editIndex].category = category;
+        // completed status stays the same
+      } else {
+        // Create new task (not completed by default)
+        tasks.push({ name, due, priority, category, completed: false });
+      }
+      saveTasks();
+      renderTasks();
+      // Close modal
+      document.getElementById('taskModal').classList.add('hidden');
+    });
+    
+    // Initial render on page load
+    renderTasks();
+  </script>
+</body>
+</html>
